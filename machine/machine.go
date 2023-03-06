@@ -113,7 +113,7 @@ func (m *Machine) fetch() (instruction uint16) {
 	return instruction
 }
 
-func (m *Machine) decodeAndExecute(instriction uint16) {
+func (m *Machine) decodeAndExecute(instruction uint16) {
 
 }
 
