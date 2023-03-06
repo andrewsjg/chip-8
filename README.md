@@ -1,4 +1,4 @@
-# chip-8
+# Chip-8 Implemented in Go
 
 A Chip-8 Emulator written in go
 
