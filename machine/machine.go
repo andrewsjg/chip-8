@@ -3,9 +3,9 @@ package machine
 import (
 	"fmt"
 	"image/color"
-	"io/ioutil"
 	"log"
 	"math/rand"
+	"os"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -112,7 +112,7 @@ func (m *Machine) handleInput() {
 
 func (m *Machine) loadProgram(fileName string) {
 
-	program, err := ioutil.ReadFile(fileName)
+	program, err := os.ReadFile(fileName)
 	if err != nil {
 		panic(err)
 	}
