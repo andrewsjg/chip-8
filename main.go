@@ -7,5 +7,5 @@ func main() {
 	machine := machine.NewMachine()
 
 	//machine.StartMachine("programs/IBM Logo.ch8")
-	machine.StartMachine("programs/tetris.ch8", false)
+	machine.StartMachine("programs/tetris.c8", false)
 }
