@@ -6,5 +6,5 @@ func main() {
 
 	machine := machine.NewMachine()
 
-	machine.StartMachine()
+	machine.StartMachine("programs/IBM Logo.ch8")
 }
