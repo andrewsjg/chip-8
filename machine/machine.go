@@ -19,6 +19,7 @@ type Machine struct {
 	Cpu     Cpu
 	Display Display
 	Input   Input
+	Debug   bool
 
 	// Use the original machine implementation or not
 	Original bool
@@ -65,9 +66,10 @@ func NewMachine() *Machine {
 	return &machine
 }
 
-func (m *Machine) StartMachine(program string) {
+func (m *Machine) StartMachine(program string, debugOn bool) {
 	log.Println("Starting machine")
 
+	m.Debug = debugOn
 	m.loadProgram(program)
 
 	// The Chip-8 machine has a 64x32 display. Which is tiny on large
@@ -163,11 +165,16 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 
 		// These two opcodes have no parameters so no further decoding required
 		case 0x00E0:
-			log.Println("Clear Screen")
+			if m.Debug {
+				fmt.Println("Clear Screen")
+			}
+
 			m.Display.Clear()
 
 		case 0x00EE:
-			log.Println("Return from Subroutine")
+			if m.Debug {
+				log.Println("Return from Subroutine")
+			}
 			m.Cpu.PC = uint16(m.Cpu.Stack[m.Cpu.SP])
 			m.Cpu.SP--
 
@@ -176,37 +183,51 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 			// Mask the instruction and shift right extract the first nibble
 			switch byte(instruction & 0xF000 >> 12) {
 			case 0x1:
-				log.Printf("Jump to nnn: %d\n", nnn)
+				if m.Debug {
+					log.Printf("Jump to nnn: %d\n", nnn)
+				}
 				m.Cpu.PC = nnn
 
 			case 0x2:
-				log.Println("Call subroutine at nnn")
+				if m.Debug {
+					log.Println("Call subroutine at nnn")
+				}
 				m.Cpu.SP++
 				m.Cpu.Stack[m.Cpu.SP] = m.Cpu.PC
 				m.Cpu.PC = nnn
 
 			case 0x3:
-				log.Println("Skip instruction if V[x] == nn")
+				if m.Debug {
+					log.Println("Skip instruction if V[x] == nn")
+				}
 				if m.Cpu.V[x] == nn {
 					m.Cpu.PC += 2
 				}
 			case 0x4:
-				log.Println("Skip instruction if V[x] != nn")
+				if m.Debug {
+					log.Println("Skip instruction if V[x] != nn")
+				}
 				if m.Cpu.V[x] != nn {
 					m.Cpu.PC += 2
 				}
 			case 0x5:
-				log.Println("Skip instruction if V[x] == V[y]")
+				if m.Debug {
+					log.Println("Skip instruction if V[x] == V[y]")
+				}
 				if m.Cpu.V[x] == m.Cpu.V[y] {
 					m.Cpu.PC += 2
 				}
 
 			case 0x6:
-				log.Println("Set VX to nn")
+				if m.Debug {
+					log.Println("Set VX to nn")
+				}
 				m.Cpu.V[x] = nn
 
 			case 0x7:
-				log.Println("Add nn to vx")
+				if m.Debug {
+					log.Println("Add nn to vx")
+				}
 				m.Cpu.V[x] += nn
 
 			// Logical and arithmetic instructions
@@ -214,23 +235,33 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 				// Mask to extract the last nibble
 				switch instruction & 0xF {
 				case 0x0:
-					log.Println("Set V[X] to V[Y]")
+					if m.Debug {
+						log.Println("Set V[X] to V[Y]")
+					}
 					m.Cpu.V[x] = m.Cpu.V[y]
 
 				case 0x1:
-					log.Println("Set V[X] to bitwise logical disjunction (OR) of V[X] and V[Y]")
+					if m.Debug {
+						log.Println("Set V[X] to bitwise logical disjunction (OR) of V[X] and V[Y]")
+					}
 					m.Cpu.V[x] |= m.Cpu.V[y]
 
 				case 0x2:
-					log.Println("Set V[X] to bitwise logical conjunction (AND) of V[X] and V[Y]")
+					if m.Debug {
+						log.Println("Set V[X] to bitwise logical conjunction (AND) of V[X] and V[Y]")
+					}
 					m.Cpu.V[x] &= m.Cpu.V[y]
 
 				case 0x3:
-					log.Println("Set V[X] to bitwise exclusive or (XOR)) of V[X] and V[Y]")
+					if m.Debug {
+						log.Println("Set V[X] to bitwise exclusive or (XOR)) of V[X] and V[Y]")
+					}
 					m.Cpu.V[x] ^= m.Cpu.V[y]
 
 				case 0x4:
-					log.Println("Set V[X] to the value of V[X] + V[Y]")
+					if m.Debug {
+						log.Println("Set V[X] to the value of V[X] + V[Y]")
+					}
 
 					// Need to set overflow flag if required
 					result := uint16(m.Cpu.V[x]) + uint16(m.Cpu.V[y])
@@ -245,7 +276,9 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 					m.Cpu.V[x] = byte(result)
 
 				case 0x5:
-					log.Println("Set V[X] to the result of V[X] - V[Y]")
+					if m.Debug {
+						log.Println("Set V[X] to the result of V[X] - V[Y]")
+					}
 					m.Cpu.V[0xf] = 1
 
 					minuend := uint16(m.Cpu.V[x])
@@ -259,7 +292,9 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 					m.Cpu.V[x] = byte(result)
 
 				case 0x6:
-					log.Println("Right Shift V[X]]")
+					if m.Debug {
+						log.Println("Right Shift V[X]]")
+					}
 
 					if m.Original {
 						m.Cpu.V[x] = m.Cpu.V[y]
@@ -272,7 +307,10 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 					m.Cpu.V[x] >>= 1
 
 				case 0x7:
-					log.Println("Set V[X] to the result of V[Y] - V[X]")
+					if m.Debug {
+						log.Println("Set V[X] to the result of V[Y] - V[X]")
+					}
+
 					m.Cpu.V[0xf] = 1
 
 					minuend := uint16(m.Cpu.V[y])
@@ -286,7 +324,9 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 					m.Cpu.V[x] = byte(result)
 
 				case 0xE:
-					log.Println("Left Shift V[X]]")
+					if m.Debug {
+						log.Println("Left Shift V[X]]")
+					}
 
 					if m.Original {
 						m.Cpu.V[x] = m.Cpu.V[y]
@@ -302,17 +342,23 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 					log.Printf("Instruction not implemented %s0x\n", fmt.Sprintf("%X", instruction))
 				}
 			case 0x9:
-				log.Println("Skip instruction if V[x] != V[y]")
+				if m.Debug {
+					log.Println("Skip instruction if V[x] != V[y]")
+				}
 				if m.Cpu.V[x] != m.Cpu.V[y] {
 					m.Cpu.PC += 2
 				}
 
 			case 0xA:
-				log.Println("Set index register")
+				if m.Debug {
+					log.Println("Set index register")
+				}
 				m.Cpu.I = nnn
 
 			case 0xB:
-				log.Println("Jump with offset")
+				if m.Debug {
+					log.Println("Jump with offset")
+				}
 
 				if m.Original {
 					m.Cpu.PC = nnn + uint16(m.Cpu.V[0x0])
@@ -321,14 +367,18 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 				}
 
 			case 0xC:
-				log.Println("Generate a random number and AND it with nn and store in V[X]")
+				if m.Debug {
+					log.Println("Generate a random number and AND it with nn and store in V[X]")
+				}
 				// Generate random byte between 0 and 255
 				rnd := byte(rand.Uint32() % 255)
 				m.Cpu.V[x] = rnd & nn
 
 			case 0xD:
 				// From: https://github.com/szTheory/chip8go
-				log.Println("Display / Draw")
+				if m.Debug {
+					log.Println("Display / Draw")
+				}
 
 				xVal := m.Cpu.V[x]
 				yVal := m.Cpu.V[y]
@@ -347,12 +397,16 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 				// Mask to extract the last nibble
 				switch instruction & 0xFF {
 				case 0x9E:
-					log.Println("Skip if key correspoding to V[X] is pressed")
+					if m.Debug {
+						log.Println("Skip if key correspoding to V[X] is pressed")
+					}
 					if m.Input[m.Cpu.V[x]] {
 						m.Cpu.PC += 2
 					}
 				case 0xA1:
-					log.Println("Skip if key correspoding to V[X] is Not pressed")
+					if m.Debug {
+						log.Println("Skip if key correspoding to V[X] is Not pressed")
+					}
 					if !m.Input[m.Cpu.V[x]] {
 						m.Cpu.PC += 2
 					}
@@ -365,19 +419,27 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 				// Mask to extract the last nibble
 				switch instruction & 0xFF {
 				case 0x07:
-					log.Println("Set V[X] to the value of the delay timer")
+					if m.Debug {
+						log.Println("Set V[X] to the value of the delay timer")
+					}
 					m.Cpu.V[x] = m.Cpu.DelayTimer
 
 				case 0x15:
-					log.Println("Set the delay timer to the value of V[X]")
+					if m.Debug {
+						log.Println("Set the delay timer to the value of V[X]")
+					}
 					m.Cpu.DelayTimer = m.Cpu.V[x]
 
 				case 0x18:
-					log.Println("Set the sound timer to the value of V[X]")
+					if m.Debug {
+						log.Println("Set the sound timer to the value of V[X]")
+					}
 					m.Cpu.SoundTimer = m.Cpu.V[x]
 
 				case 0x1E:
-					log.Println("Add V[X] to the value of the index register and store in the index register")
+					if m.Debug {
+						log.Println("Add V[X] to the value of the index register and store in the index register")
+					}
 					m.Cpu.I += uint16(m.Cpu.V[x])
 
 					// Do it the way the Amiga emulator did and set the overflow flag if the value is over 1000
@@ -386,7 +448,10 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 					}
 
 				case 0x0A:
-					log.Println("Block excution of a key is pressed")
+					if m.Debug {
+						log.Println("Block excution of a key is pressed")
+					}
+
 					keyPressed := false
 					for i := uint8(0); i < 16; i++ {
 						if m.Input[i] {
@@ -399,17 +464,25 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 					}
 
 				case 0x29:
-					log.Println("Font Character. Set the index register to the address of the character in V[X]")
+					if m.Debug {
+						log.Println("Font Character. Set the index register to the address of the character in V[X]")
+					}
+
 					m.Cpu.I = uint16(m.Cpu.V[x] * 0x5)
 
 				case 0x33:
-					log.Println("Binary coded decimal conversion")
+					if m.Debug {
+						log.Println("Binary coded decimal conversion")
+					}
 					//TODO: Anotate this
 					m.Memory[m.Cpu.I] = m.Cpu.V[x] / 100
 					m.Memory[m.Cpu.I+1] = (m.Cpu.V[x] / 10) % 10
 					m.Memory[m.Cpu.I+2] = (m.Cpu.V[x] % 100) % 10
 
 				case 0x55:
+					if m.Debug {
+						log.Println("Copy V registers to memory")
+					}
 					for i := byte(0); i < x; i++ {
 						m.Memory[m.Cpu.I+uint16(i)] = m.Cpu.V[i]
 
@@ -419,6 +492,10 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 					}
 
 				case 0x65:
+					if m.Debug {
+						fmt.Println("Copy memory to V registers")
+					}
+
 					for i := byte(0); i < x; i++ {
 						m.Cpu.V[i] = m.Memory[m.Cpu.I+uint16(i)]
 
@@ -438,6 +515,16 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 }
 
 func (m *Machine) machineCycle() {
+
+	// Update the timers
+	if m.Cpu.DelayTimer > 0 {
+		m.Cpu.DelayTimer--
+	}
+
+	if m.Cpu.SoundTimer > 0 {
+		m.Cpu.SoundTimer--
+	}
+
 	// If waiting for input, skip the cycle
 	if m.Input.wait() {
 		return
@@ -445,6 +532,7 @@ func (m *Machine) machineCycle() {
 
 	// Fetch, Decode and Execute
 	m.decodeAndExecute(m.fetch())
+
 }
 
 // Instruction Set
