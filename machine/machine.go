@@ -10,10 +10,18 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
+// Font array size. 15 sets of 5 bytes
 const fontCount = 80
+
+// The loaded program code starts at memory location 0x200
 const programStart = 0x200
+
+// 4kb of memory
 const memSize = 4096
 
+// Machine configuration. Consists of memory, CPU, Display, input
+// a debug flag. Also a flag to determine if the machine runs
+// as specified by the orginginal specification
 type Machine struct {
 	Memory  [memSize]byte
 	Cpu     Cpu
@@ -25,6 +33,8 @@ type Machine struct {
 	Original bool
 }
 
+// The font array. Contains the bytes that define the
+// font bitmaps
 var font [fontCount]uint8 = [fontCount]uint8{
 	0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
 	0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -44,10 +54,12 @@ var font [fontCount]uint8 = [fontCount]uint8{
 	0xF0, 0x80, 0xF0, 0x80, 0x80, // F
 }
 
+// Create a new machine
 func NewMachine() *Machine {
 	machine := Machine{}
 
-	memory := [4096]byte{}
+	// Setup the memory
+	memory := [memSize]byte{}
 
 	// Load the font into memory
 	for i := 0; i < fontCount; i++ {
@@ -66,6 +78,9 @@ func NewMachine() *Machine {
 	return &machine
 }
 
+// Method to start the machine.
+// Turns on debug as specified. Sets up the display and starts
+// the main loop. Controlled by ebiten.
 func (m *Machine) StartMachine(program string, debugOn bool) {
 	log.Println("Starting machine")
 
@@ -90,7 +105,7 @@ func (m *Machine) StartMachine(program string, debugOn bool) {
 
 // Handle any kepresses during a cycle.
 // The Chip-8 Machine has 16 keys. Check if any are pressed
-// and set the corresponding value in our input array accordingly.
+// and set the corresponding value in our input array accordingly
 func (m *Machine) handleInput() {
 	m.Input = [16]bool{
 		ebiten.IsKeyPressed(ebiten.KeyX),
@@ -112,6 +127,8 @@ func (m *Machine) handleInput() {
 	}
 }
 
+// Load a program into memory. This simply reads a file byte by byte
+// and loads each byte (instruction) into memory
 func (m *Machine) loadProgram(fileName string) {
 
 	program, err := os.ReadFile(fileName)
@@ -151,6 +168,9 @@ func (m *Machine) fetch() (instruction uint16) {
 	return instruction
 }
 
+// The decode and execute function. These are done in one function rather
+// than two separate functions. This is the way it makes most sense to do
+// and is recommended by the HOWTO post TODO: Add refreence here
 func (m *Machine) decodeAndExecute(instruction uint16) {
 
 	// TODO: Annotate this
@@ -171,6 +191,8 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 
 			m.Display.Clear()
 
+		// Return from a subroutine sets the program counter
+		// to the location of ths stack pointer and decrements the stack pointer
 		case 0x00EE:
 			if m.Debug {
 				log.Println("Return from Subroutine")
@@ -178,6 +200,7 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 			m.Cpu.PC = uint16(m.Cpu.Stack[m.Cpu.SP])
 			m.Cpu.SP--
 
+		// Fall into the default case for further decoding
 		// This set of opcodes require decoding the first nibble (half byte)
 		default:
 			// Mask the instruction and shift right extract the first nibble
@@ -186,20 +209,29 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 				if m.Debug {
 					log.Printf("Jump to nnn: %d\n", nnn)
 				}
+				// Set the program counter to loction nnn
 				m.Cpu.PC = nnn
 
 			case 0x2:
 				if m.Debug {
 					log.Println("Call subroutine at nnn")
 				}
+				// Increment the stack pointer
 				m.Cpu.SP++
+
+				// Put the current program counter location onto the stack
 				m.Cpu.Stack[m.Cpu.SP] = m.Cpu.PC
+
+				// The the program counter to nnn
 				m.Cpu.PC = nnn
 
 			case 0x3:
 				if m.Debug {
 					log.Println("Skip instruction if V[x] == nn")
 				}
+
+				// Check the Vx register against nn. If it is equal, skip
+				// over an instruction by incrementgin the program counter by 2
 				if m.Cpu.V[x] == nn {
 					m.Cpu.PC += 2
 				}
@@ -207,6 +239,7 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 				if m.Debug {
 					log.Println("Skip instruction if V[x] != nn")
 				}
+				// As above but check if Vx is not equal to nn
 				if m.Cpu.V[x] != nn {
 					m.Cpu.PC += 2
 				}
@@ -214,6 +247,9 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 				if m.Debug {
 					log.Println("Skip instruction if V[x] == V[y]")
 				}
+
+				// Skip over an instruction by incrementing the program counter by
+				// by 2 if register Vx is equal to Vy
 				if m.Cpu.V[x] == m.Cpu.V[y] {
 					m.Cpu.PC += 2
 				}
@@ -222,15 +258,19 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 				if m.Debug {
 					log.Println("Set VX to nn")
 				}
+				// The Vx to the value of nn
 				m.Cpu.V[x] = nn
 
 			case 0x7:
 				if m.Debug {
 					log.Println("Add nn to vx")
 				}
+
+				// Add nn to the value of register Vx
 				m.Cpu.V[x] += nn
 
-			// Logical and arithmetic instructions
+			// The next block of instructions are the
+			// Logical and arithmetic instructions and require further extraction
 			case 0x8:
 				// Mask to extract the last nibble
 				switch instruction & 0xF {
@@ -263,11 +303,13 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 						log.Println("Set V[X] to the value of V[X] + V[Y]")
 					}
 
-					// Need to set overflow flag if required
 					result := uint16(m.Cpu.V[x]) + uint16(m.Cpu.V[y])
 
+					// Need to set overflow flag if required
 					// If the result of the addition operation is greater than 255
 					// set the overflow flag to 1
+
+					// TODO: Document the overflow flag
 					m.Cpu.V[0xf] = 0
 					if result > 0xFFFF {
 						m.Cpu.V[0xf] = 1
@@ -279,8 +321,10 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 					if m.Debug {
 						log.Println("Set V[X] to the result of V[X] - V[Y]")
 					}
+					// Set the overflow flag. We will unset conditionally below
 					m.Cpu.V[0xf] = 1
 
+					//TODO: Document this
 					minuend := uint16(m.Cpu.V[x])
 					subtrahend := uint16(m.Cpu.V[y])
 
@@ -296,6 +340,8 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 						log.Println("Right Shift V[X]]")
 					}
 
+					// If the machine is setup to follow the original
+					// spec, set the Vx register to Vy
 					if m.Original {
 						m.Cpu.V[x] = m.Cpu.V[y]
 					}
@@ -311,6 +357,7 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 						log.Println("Set V[X] to the result of V[Y] - V[X]")
 					}
 
+					// The opposite of the above. Vy - Vx as opposed to Vx - Vy
 					m.Cpu.V[0xf] = 1
 
 					minuend := uint16(m.Cpu.V[y])
@@ -328,6 +375,9 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 						log.Println("Left Shift V[X]]")
 					}
 
+					// The opposite of the above. Left shift Vx as opposed to a
+					// right shift
+
 					if m.Original {
 						m.Cpu.V[x] = m.Cpu.V[y]
 					}
@@ -338,9 +388,12 @@ func (m *Machine) decodeAndExecute(instruction uint16) {
 					// Shift V[X] left by 1
 					m.Cpu.V[x] <<= 1
 
+				// If we get something unexpected simply output an error.
+				// This case should never be hit.
 				default:
 					log.Printf("Instruction not implemented %s0x\n", fmt.Sprintf("%X", instruction))
 				}
+			// The next block dont require extracting the last nibble
 			case 0x9:
 				if m.Debug {
 					log.Println("Skip instruction if V[x] != V[y]")
@@ -535,9 +588,9 @@ func (m *Machine) machineCycle() {
 
 }
 
-// Instruction Set
-
-// Methods required by ebiten
+// The methods below are required by ebiten
+// to satisfy the interface. They are called by
+// the ebiten program loop
 func (m *Machine) Update() error {
 
 	m.handleInput()
