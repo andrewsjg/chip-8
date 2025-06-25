@@ -591,11 +591,15 @@ func (m *Machine) machineCycle() {
 // The methods below are required by ebiten
 // to satisfy the interface. They are called by
 // the ebiten program loop
+const chip8Hz = 700 // Chip-8 emulation speed (Hz)
+const ebitenHz = 60 // Ebiten updates per second (Hz)
+
 func (m *Machine) Update() error {
-
 	m.handleInput()
-	m.machineCycle()
-
+	cyclesPerFrame := chip8Hz / ebitenHz
+	for i := 0; i < cyclesPerFrame; i++ {
+		m.machineCycle()
+	}
 	return nil
 }
 
